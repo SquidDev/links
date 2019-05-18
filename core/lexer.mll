@@ -150,6 +150,26 @@ object
 
   method next_lexer =
     Stack.top lexers
+
+  (* Hack to enable computation pattern syntax in handlers. *)
+  val mutable effect_mode = false
+  val mutable chevrons = 0
+  val tokens : Parser.token Queue.t = Queue.create ()
+
+  method effect_mode = effect_mode
+  method togglable = effect_mode && chevrons = 0
+  method toggle =
+    assert (chevrons = 0);
+    effect_mode <- not effect_mode
+  method enter_effect_pattern =
+    assert effect_mode;
+    chevrons <- 1 + chevrons
+  method leave_effect_pattern =
+    assert effect_mode;
+    chevrons <- chevrons - 1
+  method push_token tok =
+    Queue.push tok tokens
+   method tokens = tokens
 end
 
 let fresh_context () = new lexer_context
@@ -276,7 +296,7 @@ rule lex ctxt nl = parse
   | '\n'                                { nl (); bump_lines lexbuf 1; lex ctxt nl lexbuf }
   | '_'                                 { UNDERSCORE }
   | '='                                 { EQ }
-  | "->"                                { RARROW }
+  | "->"                                { ignore (if ctxt#togglable then ctxt#toggle); RARROW }
   | "~>"                                { SQUIGRARROW }
   | "-@"                                { LOLLI }
   | "~@"                                { SQUIGLOLLI }
@@ -294,8 +314,14 @@ rule lex ctxt nl = parse
   | "<-"                                { LARROW }
   | "<|"                                { LEFTTRIANGLE }
   | "|>"                                { RIGHTTRIANGLE }
-  | '<' (def_qname as id)               { (* come back here after scanning the start tag *)
-                                          ctxt#push_lexer (starttag ctxt nl); LXML id }
+  | '<' (def_qname as id)               { if ctxt#effect_mode && Char.isUpper id.[0]
+                                          then (
+                                            ctxt#enter_effect_pattern;
+                                            ctxt#push_token (CONSTRUCTOR id);
+                                            LANGLE)
+                                          else (
+                                            (* come back here after scanning the start tag *)
+                                            ctxt#push_lexer (starttag ctxt nl); LXML id) }
   | "<!--"                              { xmlcomment_lex ctxt nl lexbuf }
   | "[|"                                { LBRACKETBAR }
   | "|]"                                { BARRBRACKET }
@@ -319,7 +345,14 @@ rule lex ctxt nl = parse
   | '?'                                 { QUESTION }
   | "%" def_id as var                   { PERCENTVAR var }
   | '%'                                 { PERCENT }
-  | initopchar opchar * as op           { ctxt#precedence op }
+  | initopchar opchar * as op           { match op with
+                                          | "<" when ctxt#effect_mode ->
+                                            ctxt#enter_effect_pattern;
+                                            LANGLE
+                                          | ">" when ctxt#effect_mode ->
+                                            ctxt#leave_effect_pattern;
+                                            RANGLE
+                                          | _ -> ctxt#precedence op }
   | '`' (def_id as var) '`'             { if List.mem_assoc var keywords || Char.isUpper var.[0] then
                                               raise (LexicalError (lexeme lexbuf, lexeme_end_p lexbuf))
                                           else ctxt#precedence var }
@@ -334,7 +367,10 @@ rule lex ctxt nl = parse
   | "infixr"                            { INFIXR ctxt#setprec }
   | "prefix"                            { PREFIX ctxt#setprec }
   | "postfix"                           { POSTFIX ctxt#setprec }
-  | def_id as var                       { try List.assoc var keywords
+  | def_id as var                       { try
+                                            let keyword = List.assoc var keywords in
+                                            ignore (match keyword with CASE when not ctxt#effect_mode -> ctxt#toggle | _ -> ());
+                                            keyword
                                           with Not_found | NotFound _ ->
                                             if Char.isUpper var.[0] then CONSTRUCTOR var
                                             else VARIABLE var }
@@ -432,5 +468,8 @@ and regexrepl ctxt nl = parse
          -> (Lexing.lexbuf -> Parser.token) =
 fun ctxt ~newline_hook ->
    ctxt#push_lexer (lex ctxt newline_hook);
-   fun lexbuf -> ctxt#next_lexer lexbuf
+   fun lexbuf ->
+   if Queue.is_empty ctxt#tokens
+   then ctxt#next_lexer lexbuf
+   else Queue.pop ctxt#tokens
 }
