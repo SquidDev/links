@@ -62,21 +62,19 @@ object (o : 'self_type)
         let o = o#restore_envs envs in
         let (o, otherwise_phr, otherwise_dt) = o#phrase otherwise_phr in
         (* Now, to create a handler... *)
-
-        let return_clause = (pat, as_phr) in
         (* Otherwise clause: Distinguished 'session failure' name. Since
          * we'll never use the continuation (and this is invoked after pattern
          * deanonymisation in desugarHandlers), generate a fresh name for the
          * continuation argument. *)
-        let cont_pat = variable_pat ~ty:`Not_typed (Utility.gensym ~prefix:"dsh" ()) in
+        let cont_pat = variable_pat ~ty:`Not_typed (Utility.gensym ~prefix:"dsh" ()), `Not_typed in
 
         let otherwise_pat : Sugartypes.Pattern.with_pos =
-          with_dummy_pos (Pattern.Effect (failure_op_name, [], cont_pat)) in
+          with_dummy_pos (Pattern.Operation { label = failure_op_name; parameters = []; resumption = Some cont_pat }) in
 
-        let otherwise_clause = (otherwise_pat, otherwise_phr) in
-
-        let value_cases = [return_clause] in
-        let effect_cases = [otherwise_clause] in
+        let cases =
+          [ { patterns = [pat]; resumption = None; body = as_phr }; (* return clause *)
+            { patterns = [otherwise_pat]; resumption = Some cont_pat; body = otherwise_phr }]
+        in
 
         (* Manually construct a row with the two hardwired handler cases. *)
         let raw_row =
@@ -96,19 +94,14 @@ object (o : 'self_type)
           (inner_eff, try_dt,
            Types.make_empty_closed_row (), otherwise_dt) in
 
-        let hndl_desc = {
+        let descriptor = {
           shd_depth = Deep;
           shd_types = types;
           shd_raw_row = raw_row;
           shd_params = None;
         } in
 
-        let hndlr = {
-          sh_expr = try_phr;
-          sh_effect_cases = effect_cases;
-          sh_value_cases = value_cases;
-          sh_descr = hndl_desc
-        } in (o, Handle hndlr, dt)
+        (o, Handle { expressions = [try_phr]; cases; descriptor }, dt)
     | e -> super#phrasenode e
 end
 

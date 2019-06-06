@@ -47,6 +47,8 @@ exception SettingsError of string
 exception DynlinkError of string
 exception ModuleError of string * Position.t option
 exception DisabledExtension of Position.t option * (string * bool) option * string option * string
+exception EffectPatternBelowToplevel of Position.t
+exception HandleArityMismatch of Position.t
 
 
 let prefix_lines prefix s =
@@ -158,6 +160,14 @@ let format_exception =
         pos_prefix ~pos message
      | None -> pos_prefix message
      end
+  | EffectPatternBelowToplevel pos ->
+     let message = "Effect patterns must be at the top level of a handler case." in
+     let pos, _ = Position.resolve_start_expr pos in
+     pos_prefix ~pos message
+  | HandleArityMismatch pos ->
+     let message = "Arity mismatch: a handler case must have as many patterns as the handle has input computations." in
+     let pos, _ = Position.resolve_start_expr pos in
+     pos_prefix ~pos message
   | Sys.Break -> "Caught interrupt"
   | exn -> pos_prefix ("Error: " ^ Printexc.to_string exn)
 
@@ -186,3 +196,7 @@ let dynlink_error message = (DynlinkError message)
 let module_error ?pos message = (ModuleError (message, pos))
 let disabled_extension ?pos ?setting ?flag name =
   DisabledExtension (pos, setting, flag, name)
+let effect_pattern_below_toplevel pos =
+  EffectPatternBelowToplevel pos
+let handle_arity_mismatch pos =
+  HandleArityMismatch pos

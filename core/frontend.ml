@@ -42,7 +42,8 @@ struct
       let _program = CheckXmlQuasiquotes.checker#program program in
       let () = DesugarSessionExceptions.settings_check program in
       let apply =
-        ( DesugarModules.desugar_program
+        ( ElaboratePatterns.program
+          ->- DesugarModules.desugar_program
           ->- before_typing_ext session_exceptions DesugarSessionExceptions.wrap_linear_handlers
           ->- DesugarLAttributes.desugar_lattributes#program
           ->- LiftRecursive.lift_funs#program
@@ -81,7 +82,8 @@ let program tyenv pos_context program =
     let sentence = (ResolvePositions.resolve_positions pos_context)#sentence sentence in
     let _sentence = CheckXmlQuasiquotes.checker#sentence sentence in
     let apply =
-      ( DesugarModules.desugar_sentence
+      ( ElaboratePatterns.sentence
+        ->- DesugarModules.desugar_sentence
         ->- DesugarLAttributes.desugar_lattributes#sentence
         ->- LiftRecursive.lift_funs#sentence
         ->- DesugarDatatypes.sentence tyenv
