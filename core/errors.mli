@@ -33,6 +33,15 @@ exception TypeApplicationArityMismatch of
 exception TypeApplicationKindMismatch of
   { pos: Position.t; name: string; tyarg_number: int;
     expected: string; provided: string }
+exception TypeVarKindMismatch of
+  { name: string;
+    a_kind: CommonTypes.PrimaryKind.t;
+    a_subkind: CommonTypes.subkind option;
+    a_pos: Position.t;
+    b_kind: CommonTypes.PrimaryKind.t;
+    b_subkind: CommonTypes.subkind option;
+    b_pos: Position.t
+  }
 exception SettingsError of string
 exception DynlinkError of string
 exception ModuleError of string * Position.t option

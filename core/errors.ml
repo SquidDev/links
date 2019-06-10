@@ -43,6 +43,15 @@ exception TypeApplicationArityMismatch of
 exception TypeApplicationKindMismatch of
   { pos: Position.t; name: string; tyarg_number: int;
     expected: string; provided: string }
+exception TypeVarKindMismatch of
+  { name: string;
+    a_kind: CommonTypes.PrimaryKind.t;
+    a_subkind: CommonTypes.subkind option;
+    a_pos: Position.t;
+    b_kind: CommonTypes.PrimaryKind.t;
+    b_subkind: CommonTypes.subkind option;
+    b_pos: Position.t
+  }
 exception SettingsError of string
 exception DynlinkError of string
 exception ModuleError of string * Position.t option
@@ -52,10 +61,12 @@ exception DisabledExtension of Position.t option * (string * bool) option * stri
 let prefix_lines prefix s =
   prefix ^ Str.global_replace (Str.regexp "\n") ("\n" ^ prefix) s
 
+let pos_str pos = Printf.sprintf "%s:%d" pos.pos_fname pos.pos_lnum
+
 let pos_prefix ?pos line =
   let prefix =
     match pos with
-      | Some pos -> Printf.sprintf "%s:%d" pos.pos_fname pos.pos_lnum
+      | Some pos -> pos_str pos
       | None -> "***" in
   Printf.sprintf "%s: %s " prefix line
 
@@ -114,6 +125,19 @@ let format_exception =
       pos_prefix ~pos
         (Printf.sprintf "Kind mismatch: Type argument %d for type constructor %s has kind %s, but an argument of kind %s was expected. \nIn:\n%s\n"
              tyarg_number name provided expected expr)
+  | TypeVarKindMismatch  { name; a_kind; a_subkind; a_pos; b_kind; b_subkind; b_pos } ->
+     let open CommonTypes in
+     let show kind = function
+       | None -> PrimaryKind.to_string kind
+       | Some (lin, res) ->
+          Printf.sprintf "%s(%s,%s)" (PrimaryKind.to_string kind) (Linearity.to_string lin)
+            (Restriction.to_string res)
+     in
+     let a_pos, a_expr = Position.resolve_start_expr a_pos in
+     let b_pos, b_expr = Position.resolve_start_expr b_pos in
+     Printf.sprintf "Mismatch in kind for type variable `%s'.\n" name
+     ^ Printf.sprintf " Has kind %s at %s (in %s)\n" (show a_kind a_subkind) (pos_str a_pos) a_expr
+     ^ Printf.sprintf "  but has %s at %s (in %s)" (show b_kind b_subkind) (pos_str b_pos) b_expr
   | SettingsError message ->
       pos_prefix (Printf.sprintf "Settings Error: %s" message)
   | ModuleError (message, pos) ->

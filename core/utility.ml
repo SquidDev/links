@@ -499,6 +499,22 @@ struct
     List.fold_right (fun a (bs, cs) -> let (b, c) = f a in (b::bs, c::cs))
                     xs ([], [])
 
+  let rec fold_map f acc = function
+    | [] -> (acc, [])
+    | x :: xs ->
+        let acc, x = f acc x in
+        let acc, xs = fold_map f acc xs in
+        (acc, x :: xs)
+
+  let fold_mapi f =
+    let rec go i acc = function
+    | [] -> (acc, [])
+    | x :: xs ->
+        let acc, x = f i acc x in
+        let acc, xs = go (i + 1) acc xs in
+        (acc, x :: xs)
+    in go 0
+
   exception Lists_length_mismatch
 
   let rec zip' xs ys =
