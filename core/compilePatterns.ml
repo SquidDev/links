@@ -896,7 +896,7 @@ let compile_cases
  *          fun cont -> let_pattern env pat (Variable p, t) (cont, `Not_typed)
  *     in
  *     (pb, Variable p'), (inner_bindings, outer_bindings)
- * 
+ *
  * let compile_handle_parameters : raw_env -> (Pattern.t * Ir.computation * Types.datatype) list -> (Ir.binder * Ir.value) list * ((Ir.computation -> Ir.computation) * Ir.binding list)
  *   = fun env parameters ->
  *     List.fold_left
@@ -919,7 +919,7 @@ let compile_handle_cases
    *    variants, almost. There is one catch: continuation patterns still
    *    need to be compiled. However, we can handle this in a
    *    post-processing step.
-   * 
+   *
    *    The idea is to transform effect patterns into variant patterns by
    *    dropping the continuation pattern, and the compile them into a
    *    case expression. This requires constructing a (correct) type for
@@ -1110,4 +1110,3 @@ let compile_choices
       Debug.if_set (show_pattern_compilation)
         (fun () -> "Compiled choices: "^(string_of_computation result));
       result
-
