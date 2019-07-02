@@ -93,6 +93,7 @@ let restriction_of_string p =
   function
   | "Any"     -> res_any
   | "Base"    -> res_base
+  | "Mono"    -> res_mono
   | "Session" -> res_session
   | rest      ->
      raise (ConcreteSyntaxError (pos p, "Invalid kind restriction: " ^ rest))

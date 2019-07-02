@@ -196,7 +196,6 @@ Do not infer polymorphic arguments (1)
 fun(f) { (poly(~f), f(42) + 1) }
 exit : 1
 stderr : @.*
-ignore : Not currently implemented
 
 Do not infer polymorphic arguments (2)
 fun(f) { (f(42) + 1, poly(~f)) }
