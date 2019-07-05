@@ -736,7 +736,7 @@ module Unl : Constraint = struct
       method! is_var = function
         | (_, (Linearity.Unl, _), _) -> true
         | (_, _, `Flexible) -> true
-        | (_, _, `Rigid) -> true
+        | (_, _, `Rigid) -> false
     end)#predicates
 
   let make_type, make_row = (object
