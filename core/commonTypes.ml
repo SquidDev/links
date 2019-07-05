@@ -91,6 +91,7 @@ module Restriction = struct
     | Base, Base       -> Some Base
     | x, Any | Any, x  -> Some x (* Any will narrow to anything. *)
     | Base, Mono | Mono, Base -> Some Base (* Mono can narrow to Base. *)
+    | Session, Mono | Mono, Session -> Some Session (* Super dubious, but we don't have another way*)
     | _ -> None
 end
 

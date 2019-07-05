@@ -564,7 +564,7 @@ class virtual type_predicate = object(self)
     | `Body t -> f vars t
     | `Recursive (var, t) -> check_rec var rec_vars true (fun rec_vars' -> f (rec_appl, rec_vars', quant_vars) t)
 
-  method is_type ((rec_appl, rec_vars, quant_vars) as vars) = function
+  method is_type ((rec_appl, rec_vars, quant_vars) as vars) : typ -> bool = function
     | `Not_typed -> assert false
     | `Primitive _ -> true
     | `Function (a, e, r) | `Lolli (a, e, r) -> self#is_type vars a && self#is_row vars e && self#is_type vars r
@@ -574,9 +574,11 @@ class virtual type_predicate = object(self)
     | `Alias (_, t) -> self#is_type vars t
     | `MetaTypeVar point -> self#is_point self#is_type vars point
     | `ForAll (qs, t) -> self#is_type (rec_appl, rec_vars, add_quantified_vars !qs quant_vars) t
-    | `Dual s -> self#is_type vars s
     | `Application _ | `RecursiveApplication _ -> true (* TODO: THIS! *)
-    | #session_type -> false
+    | `Select r | `Choice r -> self#is_row vars r
+    | `Input (a, b) | `Output (a, b) -> self#is_type vars a && self#is_type vars b
+    | `Dual s -> self#is_type vars s
+    | `End -> true
 
   method is_field vars = function
     | `Absent -> true
@@ -604,7 +606,7 @@ class virtual type_iter = object(self)
     | `Body t -> f vars t
     | `Recursive (var, t) -> check_rec var rec_vars () (fun rec_vars' -> f (rec_appl, rec_vars', quant_vars) t)
 
-  method visit_type ((rec_appl, rec_vars, quant_vars) as vars) = function
+  method visit_type ((rec_appl, rec_vars, quant_vars) as vars) : typ -> unit = function
     | `Not_typed -> assert false
     | `Primitive _ -> ()
     | `Function (a, e, r) | `Lolli (a, e, r) -> self#visit_type vars a; self#visit_row vars e; self#visit_type vars r
@@ -614,9 +616,11 @@ class virtual type_iter = object(self)
     | `Alias (_, t) -> self#visit_type vars t
     | `MetaTypeVar point -> self#visit_point self#visit_type vars point
     | `ForAll (qs, t) -> self#visit_type (rec_appl, rec_vars, add_quantified_vars !qs quant_vars) t
-    | `Dual s -> self#visit_type vars s
     | `Application _ | `RecursiveApplication _ -> () (* TODO: THIS! *)
-    | #session_type -> ()
+    | `Select r | `Choice r -> self#visit_row vars r
+    | `Input (a, b) | `Output (a, b) -> self#visit_type vars a; self#visit_type vars b
+    | `Dual s -> self#visit_type vars s
+    | `End -> ()
 
   method visit_field vars = function
     | `Absent -> ()
@@ -775,7 +779,24 @@ module Session : Constraint = struct
 
   let is_type, is_row = make_restriction_predicate (module SessionPredicate) Session false
   let can_type_be, can_row_be = make_restriction_predicate (module SessionPredicate) Session true
-  let make_type, make_row = make_restriction_transform Session
+  let make_type, make_row =
+    (object
+       inherit type_iter as super
+
+       method! visit_var point = function
+         | (_, (_, Session), _) -> ()
+         | (v, (l, sk), `Flexible) ->
+            begin
+              match Restriction.min sk Session with
+              | Some Session -> Unionfind.change point (`Var (v, (l, sk), `Flexible))
+              | _ -> assert false
+            end
+         | (_, _, `Rigid) -> assert false
+
+       method! visit_type vars = function
+         | #session_type -> ()
+         | ty -> super#visit_type vars ty
+     end)#visitors
 end
 
 module Mono : Constraint = struct
@@ -801,9 +822,10 @@ module Mono : Constraint = struct
          | (_, (_, Mono), _) -> true
          | (_, _, `Rigid) -> true
          | (_, (_, sk), `Flexible) ->
+              (* Mono is substantially more lax - we just require that we can unify with any subkind *)
               match Restriction.min sk Mono with
-              | Some Mono -> true
-              | _ -> false
+              | Some _ -> true
+              | None -> false
      end)#predicates
 
   let make_type, make_row = make_restriction_transform ~ok:true Mono
