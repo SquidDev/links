@@ -2141,9 +2141,7 @@ let make_ft_poly_curry declared_linearity ps effects return_type =
   Types.for_all (ft ps)
 
 (** Make any unannotated parameters monomorphic. *)
-let make_mono pats =
-  (* TODO: Fix this! We need to do something more sensible when we find Session effects *)
-  List.iter (List.iter (fun (_, _, t) -> Types.Mono.make_type t)) pats;
+let make_mono pats = List.iter (List.iter (fun (_, _, t) -> Types.Mono.make_type t)) pats;
 
 type usagemap = int stringmap
 let merge_usages (ms:usagemap list) : usagemap =
@@ -3815,6 +3813,7 @@ and type_binding : context -> binding -> binding * context * usagemap =
                   t
               | _ -> typ body in
           let () = unify pos ~handle:Gripers.bind_val (ppos_and_typ pat, (exp_pos body, bt)) in
+          Types.Mono.make_type (pattern_typ pat);
           let usage = usages body in
           let body = erase body in
           let tyvars, pat, penv =
