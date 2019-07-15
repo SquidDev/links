@@ -326,7 +326,6 @@ args : --config=tests/examples_default.config
 Typecheck example file examples/handlers/pipes.links
 examples/handlers/pipes.links
 filemode : true
-ignore : broken example
 args : --config=tests/examples_default.config
 
 Typecheck example file examples/handlers/racing-lines.links
@@ -363,7 +362,7 @@ args : --config=tests/examples_default.config
 Typecheck example file examples/handlers/sudoku.links
 examples/handlers/sudoku.links
 filemode : true
-args : --config=tests/examples_default.config
+args : --config=tests/examples_effect_sugar.config
 
 Typecheck example file examples/handlers/tests.links
 examples/handlers/tests.links
