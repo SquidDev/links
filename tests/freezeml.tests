@@ -222,3 +222,8 @@ Do not infer polymorphic values (2)
 fun(bot: (forall a. a)) { var f = bot(bot); (f(42) + 1, poly(~f)) }
 exit : 1
 stderr : @.*Type error:.*
+
+Do not instantiate on applications (7)
+head(ids)(3)
+exit : 1
+stderr : @.*Type error:.*

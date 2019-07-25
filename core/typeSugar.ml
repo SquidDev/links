@@ -21,8 +21,6 @@ let endbang_antiquotes = Basicsettings.TypeSugar.endbang_antiquotes
 
 let check_top_level_purity = Basicsettings.TypeSugar.check_top_level_purity
 
-let dodgey_type_isomorphism = Basicsettings.TypeSugar.dodgey_type_isomorphism
-
 module Env = Env.String
 
 module Utils : sig
@@ -280,6 +278,7 @@ sig
   val unary_apply : griper
   val infix_apply : griper
   val fun_apply : griper
+  val fun_poly_apply : pos:Position.t -> (string * Types.datatype) -> 'a
 
   val generalise_value_restriction : Position.t -> string -> 'a
 
@@ -974,6 +973,16 @@ end
                 String.concat (nl() ^ "and" ^ nl()) ppr_types ^ nl  () ^
                "and the currently allowed effects are"        ^ nli () ^
                 code ppr_eff)
+
+    let fun_poly_apply ~pos (lexpr, lt) =
+      build_tyvar_names [lt];
+      let ppr_type  = show_type lt in
+      die pos ("The function"                                 ^ nli () ^
+                code lexpr                                    ^ nl  () ^
+               "has polymorphic type"                         ^ nli () ^
+                code ppr_type                                 ^ nl  () ^
+               "and so cannot be applied."                    ^ nl ()  ^
+               "Maybe instantiate it with " ^ code "@" ^ ".")
 
     let generalise_value_restriction pos exp =
       die pos ("Because of the value restriction, the expression " ^ nli () ^
@@ -2960,43 +2969,7 @@ let rec type_check : context -> phrase -> phrase * Types.datatype * usagemap =
               begin
                 match Types.concrete_type (typ f) with
                   | `ForAll (_, (`Function _ | `Lolli _)) as t ->
-                     begin
-                       match Instantiate.typ t with
-                       | tyargs, (`Function (fps, fe, rettyp) | `Lolli (fps, fe, rettyp) as t) ->
-                          let mkft (a, e, r) = match t with
-                            | `Function _ -> `Function (a, e, r)
-                            | `Lolli _ -> `Lolli (a, e, r)
-                          in
-                          (* the free type variables in the arguments (and effects) *)
-                          let arg_vars = Types.TypeVarSet.union (Types.free_type_vars fps) (Types.free_row_type_vars fe) in
-                          (* return true if this quantifier appears free in the arguments (or effects) *)
-                          let free_in_arg q = Types.TypeVarSet.mem (Types.var_of_quantifier q) arg_vars in
-
-                          (* quantifiers for the return type *)
-                          let rqs =
-                            if Settings.get_value dodgey_type_isomorphism then
-                              let rta, rqs =
-                                List.map (fun q -> (q, Types.quantifier_of_type_arg q)) tyargs
-                                |> List.filter (fun (_, q) -> free_in_arg q)
-                                |> List.split
-                              in
-                              List.iter Generalise.rigidify_type_arg rta;
-                              rqs
-                            else
-                              []
-                          in
-
-                          let rettyp = Types.for_all (rqs, rettyp) in
-                          let ft = `Function (fps, fe, rettyp) in
-                          let f' = erase f in
-                          let e = tabstr (rqs, FnAppl (with_dummy_pos (tappl (f'.node, tyargs)), List.map erase ps)) in
-                          unify ~handle:Gripers.fun_apply
-                            ((exp_pos f, ft), no_pos (mkft (Types.make_tuple_type (List.map typ ps),
-                                                            context.effect_row,
-                                                            rettyp)));
-                          e, rettyp, merge_usages (usages f :: List.map usages ps)
-                       | _ -> assert false
-                     end
+                     Gripers.fun_poly_apply ~pos (exp_pos f, t)
                   | ft ->
                       let rettyp = Types.fresh_type_variable (lin_any, res_any) in
                       begin
